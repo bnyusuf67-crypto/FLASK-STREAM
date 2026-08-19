@@ -148,8 +148,11 @@ def serve_hls(filename):
     return response
 
 # Sunucu veya script başladığında thread derhal devreye girer
-trigger_thread = threading.Thread(target=periodic_site_trigger, daemon=True)
-trigger_thread.start()
+def init_background_thread():
+    trigger_thread = threading.Thread(target=periodic_site_trigger, daemon=True)
+    trigger_thread.start()
+
+init_background_thread()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
