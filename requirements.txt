@@ -1,3 +1,4 @@
 Flask
-gunicorn
 requests
+urllib3
+gunicorn
