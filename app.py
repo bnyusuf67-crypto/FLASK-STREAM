@@ -71,9 +71,11 @@ def create_master_manifest():
     """HLS istemcileri için master.m3u8 oluşturur."""
     master_content = """#EXTM3U
 #EXT-X-VERSION:3
-#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1200000,NAME=576p,RESOLUTION=1024x576
-showturk_576p.m3u8
-#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=600000,NAME=360p,RESOLUTION=640x360
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1500000,RESOLUTION=1920x1080
+showturk_1080p.m3u8
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=1200000,RESOLUTION=1280x720
+showturk_720p.m3u8
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=600000,RESOLUTION=640x360
 showturk_360p.m3u8"""
 
     with open(os.path.join(HLS_DIR, "master.m3u8"), "w", encoding="utf-8") as f:
@@ -83,8 +85,8 @@ def start_ffmpeg_process():
     """FFmpeg sürecini kopma korumalı (Reconnect) parametrelerle başlatır."""
     global ffmpeg_process
     
-    url_576p, url_360p = get_dynamic_stream_urls()
-    if not url_576p or not url_360p:
+    url_1080p, url_720p, url_360p = get_dynamic_stream_urls()
+    if not url_1080p or not url_720p or not url_360p:
         print("[HATA] Akış URL'leri alınamadı, FFmpeg başlatılamıyor.")
         return False
 
@@ -96,21 +98,30 @@ def start_ffmpeg_process():
     # Reconnect flag'leri ile ağ kopmalarına karşı dirençli FFmpeg komutu
     ffmpeg_cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
-        # 1. Giriş (576p) Koruma Parametreleri
+        # 1. Giriş (1080p) Koruma Parametreleri
         "-reconnect", "1", "-reconnect_at_eof", "1", 
         "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
-        "-i", url_576p,
-        # 2. Giriş (360p) Koruma Parametreleri
+        "-i", url_1080p,
+        # 2. Giriş (720p) Koruma Parametreleri
+        "-reconnect", "1", "-reconnect_at_eof", "1", 
+        "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+        "-i", url_720p,
+        # 3. Giriş (360p) Koruma Parametreleri
         "-reconnect", "1", "-reconnect_at_eof", "1", 
         "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
         "-i", url_360p,
-        # Çıktı 1: 576p
+        # Çıktı 1: 1080p
         "-map", "0:v?", "-map", "0:a?", "-c", "copy",
         "-f", "hls", "-hls_time", "4", "-hls_list_size", "10",
         "-hls_flags", "delete_segments+append_list",
-        os.path.join(HLS_DIR, "showturk_576p.m3u8"),
-        # Çıktı 2: 360p
+        os.path.join(HLS_DIR, "showturk_1080p.m3u8"),
+        # Çıktı 2: 720p
         "-map", "1:v?", "-map", "1:a?", "-c", "copy",
+        "-f", "hls", "-hls_time", "4", "-hls_list_size", "10",
+        "-hls_flags", "delete_segments+append_list",
+        os.path.join(HLS_DIR, "showturk_720p.m3u8")
+        # Çıktı 3: 360p
+        "-map", "2:v?", "-map", "2:a?", "-c", "copy",
         "-f", "hls", "-hls_time", "4", "-hls_list_size", "10",
         "-hls_flags", "delete_segments+append_list",
         os.path.join(HLS_DIR, "showturk_360p.m3u8")
@@ -141,8 +152,10 @@ def index():
     return """
     <h1>Show Türk HLS Streamer (Auto-Recover)</h1>
     <ul>
+        <li><a href='/start'>Başlatma Tuşu</a></li>
         <li><a href='/hls_stream/master.m3u8'>Master Playlist</a></li>
-        <li><a href='/hls_stream/showturk_576p.m3u8'>576p Playlist</a></li>
+        <li><a href='/hls_stream/showturk_1080p.m3u8'>1080p Playlist</a></li>
+        <li><a href='/hls_stream/showturk_720p.m3u8'>720p Playlist</a></li>
         <li><a href='/hls_stream/showturk_360p.m3u8'>360p Playlist</a></li>
     </ul>
     """
