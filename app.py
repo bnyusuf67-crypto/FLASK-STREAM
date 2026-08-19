@@ -41,28 +41,28 @@ def get_showturk_master_url():
     return None
 
 def get_dynamic_stream_urls():
-    """Master M3U8 dosyasını okuyup gerçek kalite bağlantılarını dinamik ayıklar."""
+    """Master M3U8 dosyasını okuyup kalite bağlantılarını ayrıştırır."""
     master_url = get_showturk_master_url()
     if not master_url:
-        return None, None
+        return None, None, None
 
     try:
         res = requests.get(master_url, verify=False, timeout=10)
         if res.status_code == 200:
             lines = [line.strip() for line in res.text.splitlines() if line.strip() and not line.startswith("#")]
-            # Göreli URL'leri tam URL'ye çevir
             full_urls = [urljoin(master_url, line) for line in lines]
             
-            if len(full_urls) >= 2:
-                return full_urls[0], full_urls[1] # Yüksek ve Düşük Kalite
+            if len(full_urls) >= 3:
+                return full_urls[0], full_urls[1], full_urls[2]
+            elif len(full_urls) == 2:
+                return full_urls[0], full_urls[1], full_urls[1]
             elif len(full_urls) == 1:
-                return full_urls[0], full_urls[0]
+                return full_urls[0], full_urls[0], full_urls[0]
     except Exception as e:
         print(f"[HATA] Dinamik URL ayrıştırma başarısız: {e}")
 
-    # Tahmini yedek URL bağlantısı
     base_suffix = master_url.replace(".m3u8", "")
-    return f"{base_suffix}_576p.m3u8", f"{base_suffix}_360p.m3u8"
+    return f"{base_suffix}.m3u8", f"{base_suffix}_720p.m3u8", f"{base_suffix}_360p.m3u8"
 
 # ==========================================
 # 2. MANİFEST VE FFMPEG AKIŞ YÖNETİMİ
@@ -82,7 +82,7 @@ showturk_360p.m3u8"""
         f.write(master_content)
 
 def start_ffmpeg_process():
-    """FFmpeg sürecini kopma korumalı (Reconnect) parametrelerle başlatır."""
+    """FFmpeg sürecini başlatır."""
     global ffmpeg_process
     
     url_1080p, url_720p, url_360p = get_dynamic_stream_urls()
@@ -95,18 +95,17 @@ def start_ffmpeg_process():
     if ffmpeg_process and ffmpeg_process.poll() is None:
         ffmpeg_process.kill()
 
-    # Reconnect flag'leri ile ağ kopmalarına karşı dirençli FFmpeg komutu
     ffmpeg_cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
-        # 1. Giriş (1080p) Koruma Parametreleri
+        # 1. Giriş (1080p)
         "-reconnect", "1", "-reconnect_at_eof", "1", 
         "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
         "-i", url_1080p,
-        # 2. Giriş (720p) Koruma Parametreleri
+        # 2. Giriş (720p)
         "-reconnect", "1", "-reconnect_at_eof", "1", 
         "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
         "-i", url_720p,
-        # 3. Giriş (360p) Koruma Parametreleri
+        # 3. Giriş (360p)
         "-reconnect", "1", "-reconnect_at_eof", "1", 
         "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
         "-i", url_360p,
@@ -119,7 +118,7 @@ def start_ffmpeg_process():
         "-map", "1:v?", "-map", "1:a?", "-c", "copy",
         "-f", "hls", "-hls_time", "4", "-hls_list_size", "10",
         "-hls_flags", "delete_segments+append_list",
-        os.path.join(HLS_DIR, "showturk_720p.m3u8")
+        os.path.join(HLS_DIR, "showturk_720p.m3u8"),  # <-- Düzeltilen virgül burasıdır
         # Çıktı 3: 360p
         "-map", "2:v?", "-map", "2:a?", "-c", "copy",
         "-f", "hls", "-hls_time", "4", "-hls_list_size", "10",
@@ -132,10 +131,9 @@ def start_ffmpeg_process():
     return True
 
 # ==========================================
-# 3. WATCHDOG (OTOMATİK İZLEYİCİ VE YENİDEN BAŞLATICI)
+# 3. WATCHDOG (OTOMATİK İZLEYİCİ)
 # ==========================================
 def stream_watchdog():
-    """FFmpeg durumunu kontrol eder, durmuşsa otomatik olarak tekrar başlatır."""
     global ffmpeg_process, is_running
     while True:
         time.sleep(10)
@@ -175,7 +173,6 @@ def serve_hls(filename):
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
-# Arka plan izleyicisini (Watchdog) global alanda başlat (Gunicorn / Render uyumlu)
 watchdog_thread = threading.Thread(target=stream_watchdog, daemon=True)
 watchdog_thread.start()
 
