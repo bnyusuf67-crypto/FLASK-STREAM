@@ -1,4 +1,4 @@
-# Python tabanlı hafif Alpine/Slim imajı
+# Python tabanlı hafif Slim imajı
 FROM python:3.10-slim
 
 # Sistem güncellemeleri ve FFmpeg kurulumu
@@ -23,5 +23,5 @@ RUN mkdir -p hls_stream
 # Render / Konteyner portunu dışa aç
 EXPOSE 10000
 
-# Gunicorn ile uygulamayı başlat (Dosya adınız main.py ise 'main:app' yapın)
+# Gunicorn ile uygulamayı tek worker ve 4 thread ile çalıştır
 CMD ["gunicorn", "--bind", "0.0.0.0:10000", "--workers", "1", "--threads", "4", "app:app"]
