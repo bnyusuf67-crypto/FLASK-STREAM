@@ -20,7 +20,7 @@ app = Flask(__name__)
 ffmpeg_process = None
 ffmpeg_lock = threading.Lock()
 stream_start_time = 0
-TOKEN_REFRESH_INTERVAL = 7200  # 2 Saat (Önleyici yenileme)
+TOKEN_REFRESH_INTERVAL = 6800  # En Önleyici yenileme
 
 # ==========================================
 # 1. SHOW TÜRK & DİNAMİK URL AYRIŞTIRMA
