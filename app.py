@@ -7,7 +7,7 @@ import time
 import requests
 import urllib3
 from urllib.parse import urljoin
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, send_from_directory, jsonify, request, make_response
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -20,7 +20,19 @@ app = Flask(__name__)
 ffmpeg_process = None
 ffmpeg_lock = threading.Lock()
 stream_start_time = 0
-TOKEN_REFRESH_INTERVAL = 6800  # En Önleyici yenileme
+TOKEN_REFRESH_INTERVAL = 6800  # En Önleyici yenileme (Saniye)
+
+# ==========================================
+# 0. GLOBAL CORS VE PREFLIGHT YÖNETİMİ (500 Hatası Önleyici)
+# ==========================================
+@app.after_request
+def add_cors_headers(response):
+    """Tüm yanıtlara (GET, OPTIONS vb.) eksiksiz hls.js uyumlu CORS başlıklarını ekler."""
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS, HEAD"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Range, Authorization"
+    response.headers["Access-Control-Expose-Headers"] = "Content-Length, Content-Range"
+    return response
 
 # ==========================================
 # 1. SHOW TÜRK & DİNAMİK URL AYRIŞTIRMA
@@ -136,7 +148,7 @@ def start_ffmpeg_process():
 
         ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         stream_start_time = time.time()
-        print("[BİLGİ] FFmpeg süreci başarıyla başlatıldı.")
+        print("[BİLGİ] Show Türk FFmpeg süreci başarıyla başlatıldı.")
         return True
 
 # ==========================================
@@ -169,7 +181,7 @@ threading.Thread(target=stream_watchdog, daemon=True).start()
 @app.route("/")
 def index():
     return """
-    <h1>Show Türk HLS Streamer (Autonomous & Auto-Recover)</h1>
+    <h1>Show Türk HLS Streamer (Full hls.js & CORS Support)</h1>
     <ul>
         <li><a href='/hls_stream/master.m3u8'>Master Playlist</a></li>
         <li><a href='/hls_stream/showturk_1080p.m3u8'>1080p Playlist</a></li>
@@ -183,28 +195,16 @@ def index():
 def serve_hls(filename):
     global ffmpeg_process
     
-    # 1. Tarayıcının OPTIONS (Preflight) isteğine onay ver
+    # 1. hls.js Preflight (OPTIONS) İsteğini Güvenli Şekilde Yanıtla
     if request.method == "OPTIONS":
-        response = app.make_default_options_response()
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Range"
-        return response
+        return make_response("", 200)
 
     # 2. LAZY LOAD: İlk izleyici isteğinde yayın başlatılır
     if ffmpeg_process is None or ffmpeg_process.poll() is not None:
-        print("[LAZY LOAD] İlk izleyici isteği geldi. CNN Türk yayını başlatılıyor...")
+        print("[LAZY LOAD] İlk izleyici isteği geldi. Show Türk yayını başlatılıyor...")
         start_ffmpeg_process()
         
-    response = send_from_directory(HLS_DIR, filename)
-    
-    # 3. hls.js Uyumlu Tam CORS Başlıkları
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Range"
-    response.headers["Access-Control-Expose-Headers"] = "Content-Length, Content-Range"
-    
-    return response
+    return send_from_directory(HLS_DIR, filename)
 
 @app.route("/health")
 def health_check():
