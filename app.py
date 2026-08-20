@@ -187,6 +187,7 @@ def index():
         <li><a href='/hls_stream/showturk_1080p.m3u8'>1080p Playlist</a></li>
         <li><a href='/hls_stream/showturk_720p.m3u8'>720p Playlist</a></li>
         <li><a href='/hls_stream/showturk_360p.m3u8'>360p Playlist</a></li>
+        <li><a href='/restart'>Yeniden Başlatma Tuşu</a></li>
         <li><a href='/health'>Health Status</a></li>
     </ul>
     """
